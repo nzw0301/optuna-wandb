@@ -15,6 +15,9 @@ from torchvision import datasets
 from torchvision import transforms
 
 
+# without this, wandb causes error.
+os.environ["WANDB_START_METHOD"] = "thread"
+
 DEVICE = torch.device("cpu")
 BATCHSIZE = 128
 CLASSES = 10
@@ -62,6 +65,9 @@ def get_data_loaders():
     return train_loader, valid_loader
 
 
+# Get the data loaders of FashionMNIST dataset.
+train_loader, valid_loader = get_data_loaders()
+
 def objective(trial):
 
     # Generate the model.
@@ -72,14 +78,14 @@ def objective(trial):
     lr = trial.suggest_float("lr", 1e-5, 1e-1, log=True)
     optimizer = getattr(optim, optimizer_name)(model.parameters(), lr=lr)
 
-    # Get the data loaders of FashionMNIST dataset.
-    train_loader, valid_loader = get_data_loaders()
-
     # init tracking experiment.
     # hyper-parameters, trial id are stored.
+    config = dict(trial.params)
+    config["trial.number"] = trial.number
     wandb.init(
         project="optuna",
-        config=trial.params + {"trial.number": trial.number},
+        entity="nzw0301",  # NOTE: this entity depends on your wandb account.
+        config=config,
         group=STUDY_NAME,
     )
 
@@ -121,10 +127,14 @@ def objective(trial):
 
         # Handle pruning based on the intermediate value.
         if trial.should_prune():
+            wandb.run.summary["state"] = "pruned"
+            wandb.finish(quiet=True)
             raise optuna.exceptions.TrialPruned()
 
     # report the final validation accuracy to wandb
     wandb.run.summary["final accuracy"] = accuracy
+    wandb.run.summary["state"] = "complated"
+    wandb.finish(quiet=True)
 
     return accuracy
 
