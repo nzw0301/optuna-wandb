@@ -87,6 +87,7 @@ def objective(trial):
         entity="nzw0301",  # NOTE: this entity depends on your wandb account.
         config=config,
         group=STUDY_NAME,
+        reinit=True
     )
 
     # Training of the model.
