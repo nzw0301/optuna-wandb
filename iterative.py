@@ -23,6 +23,7 @@ EPOCHS = 10
 LOG_INTERVAL = 10
 N_TRAIN_EXAMPLES = BATCHSIZE * 30
 N_VALID_EXAMPLES = BATCHSIZE * 10
+STUDY_NAME = "pytorch-optimization"
 
 
 def define_model(trial):
@@ -74,6 +75,14 @@ def objective(trial):
     # Get the data loaders of FashionMNIST dataset.
     train_loader, valid_loader = get_data_loaders()
 
+    # init tracking experiment.
+    # hyper-parameters, trial id are stored.
+    wandb.init(
+        project="optuna",
+        config=trial.params + {"trial.number": trial.number},
+        group=STUDY_NAME,
+    )
+
     # Training of the model.
     for epoch in range(EPOCHS):
         model.train()
@@ -105,18 +114,23 @@ def objective(trial):
                 correct += pred.eq(target.view_as(pred)).sum().item()
 
         accuracy = correct / min(len(valid_loader.dataset), N_VALID_EXAMPLES)
-
         trial.report(accuracy, epoch)
+
+        # report validation accuracy to wandb
+        wandb.log(data={"validation accuracy": accuracy}, step=epoch)
 
         # Handle pruning based on the intermediate value.
         if trial.should_prune():
             raise optuna.exceptions.TrialPruned()
 
+    # report the final validation accuracy to wandb
+    wandb.run.summary["final accuracy"] = accuracy
+
     return accuracy
 
 
 if __name__ == "__main__":
-    study = optuna.create_study(direction="maximize")
+    study = optuna.create_study(direction="maximize", study_name=STUDY_NAME)
     study.optimize(objective, n_trials=100, timeout=600)
 
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
