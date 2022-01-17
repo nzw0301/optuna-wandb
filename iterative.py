@@ -22,7 +22,7 @@ DEVICE = torch.device("cpu")
 BATCHSIZE = 128
 CLASSES = 10
 DIR = os.getcwd()
-EPOCHS = 10
+EPOCHS = 100
 LOG_INTERVAL = 10
 N_TRAIN_EXAMPLES = BATCHSIZE * 30
 N_VALID_EXAMPLES = BATCHSIZE * 10
@@ -49,24 +49,18 @@ def define_model(trial):
     return nn.Sequential(*layers)
 
 
-def get_data_loaders():
-    # Load FashionMNIST dataset.
-    train_loader = torch.utils.data.DataLoader(
-        datasets.FashionMNIST(DIR, train=True, download=True, transform=transforms.ToTensor()),
-        batch_size=BATCHSIZE,
-        shuffle=True,
-    )
-    valid_loader = torch.utils.data.DataLoader(
-        datasets.FashionMNIST(DIR, train=False, transform=transforms.ToTensor()),
-        batch_size=BATCHSIZE,
-        shuffle=True,
-    )
-
-    return train_loader, valid_loader
-
-
 # Get the data loaders of FashionMNIST dataset.
-train_loader, valid_loader = get_data_loaders()
+train_loader = torch.utils.data.DataLoader(
+    datasets.FashionMNIST(DIR, train=True, download=True, transform=transforms.ToTensor()),
+    batch_size=BATCHSIZE,
+    shuffle=True,
+)
+valid_loader = torch.utils.data.DataLoader(
+    datasets.FashionMNIST(DIR, train=False, transform=transforms.ToTensor()),
+    batch_size=BATCHSIZE,
+    shuffle=True,
+)
+
 
 def objective(trial):
 
@@ -74,7 +68,7 @@ def objective(trial):
     model = define_model(trial).to(DEVICE)
 
     # Generate the optimizers.
-    optimizer_name = trial.suggest_categorical("optimizer", ["Adam", "RMSprop", "SGD"])
+    optimizer_name = trial.suggest_categorical("optimizer", ["AdamW", "RMSprop", "SGD"])
     lr = trial.suggest_float("lr", 1e-5, 1e-1, log=True)
     optimizer = getattr(optim, optimizer_name)(model.parameters(), lr=lr)
 
