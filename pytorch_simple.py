@@ -2,7 +2,6 @@
 copied from https://github.com/optuna/optuna-examples/blob/63fe36db4701d5b230ade04eb2283371fb2265bf/pytorch/pytorch_simple.py
 """
 
-import wandb
 import os
 import optuna
 from optuna.trial import TrialState
@@ -14,9 +13,6 @@ import torch.utils.data
 from torchvision import datasets
 from torchvision import transforms
 
-
-# without this, wandb causes error.
-os.environ["WANDB_START_METHOD"] = "thread"
 
 DEVICE = torch.device("cpu")
 BATCHSIZE = 128
@@ -72,18 +68,6 @@ def objective(trial):
     lr = trial.suggest_float("lr", 1e-5, 1e-1, log=True)
     optimizer = getattr(optim, optimizer_name)(model.parameters(), lr=lr)
 
-    # init tracking experiment.
-    # hyper-parameters, trial id are stored.
-    config = dict(trial.params)
-    config["trial.number"] = trial.number
-    wandb.init(
-        project="optuna",
-        entity="nzw0301",  # NOTE: this entity depends on your wandb account.
-        config=config,
-        group=STUDY_NAME,
-        reinit=True
-    )
-
     # Training of the model.
     for epoch in range(EPOCHS):
         model.train()
@@ -117,19 +101,9 @@ def objective(trial):
         accuracy = correct / min(len(valid_loader.dataset), N_VALID_EXAMPLES)
         trial.report(accuracy, epoch)
 
-        # report validation accuracy to wandb
-        wandb.log(data={"validation accuracy": accuracy}, step=epoch)
-
         # Handle pruning based on the intermediate value.
         if trial.should_prune():
-            wandb.run.summary["state"] = "pruned"
-            wandb.finish(quiet=True)
             raise optuna.exceptions.TrialPruned()
-
-    # report the final validation accuracy to wandb
-    wandb.run.summary["final accuracy"] = accuracy
-    wandb.run.summary["state"] = "complated"
-    wandb.finish(quiet=True)
 
     return accuracy
 
