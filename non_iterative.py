@@ -5,7 +5,7 @@ Mainly copied from https://github.com/optuna/optuna-examples/blob/main/wandb/wan
 import optuna
 from optuna.integration.wandb import WeightsAndBiasesCallback
 
-from sklearn.datasets import load_breast_cancer
+from sklearn.datasets import fetch_olivetti_faces
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
@@ -14,13 +14,14 @@ import wandb
 
 def objective(trial):
 
-    data = load_breast_cancer()
+    data = fetch_olivetti_faces()
     x_train, x_valid, y_train, y_valid = train_test_split(data["data"], data["target"])
 
     params = {
-        "min_samples_leaf": trial.suggest_int("min_samples_leaf", 2, 10),
-        "max_depth": trial.suggest_int("max_depth", 5, 20),
-        "min_samples_split": trial.suggest_int("min_samples_split", 2, 10),
+        "n_estimators": trial.suggest_int("min_samples_leaf", 1, 256, log=True),
+        "min_samples_leaf": trial.suggest_int("min_samples_leaf", 1, 256, log=True),
+        "max_depth": trial.suggest_int("max_depth", 1, 256, log=True),
+        "min_samples_split": trial.suggest_int("min_samples_split", 2, 256, log=True),
     }
 
     clf = RandomForestClassifier(**params)
@@ -31,37 +32,45 @@ def objective(trial):
     return score
 
 
-if __name__ == "__main__":
-    samplers = (
-        optuna.samplers.CmaEsSampler,
-        optuna.samplers.NSGAIISampler,
-        optuna.samplers.RandomSampler,
-        optuna.samplers.TPESampler,
-    )
+samplers = (
+    optuna.samplers.RandomSampler,
+    optuna.samplers.TPESampler,
+)
 
-    num_runs = 3
+num_runs = 5
+n_trials = 30
 
-    for sampler in samplers:
-        for _ in range(num_runs):
-            wandb_kwargs = {
-                "project": "sklearn-wandb", "entity": "nzw0301", "config": {"sampler": sampler.__name__},
-                "reinit": True
+for sampler in samplers:
+    for _ in range(num_runs):
+        wandb_kwargs = {
+            "project": "sklearn-wandb",
+            "entity": "nzw0301",
+            "config": {"sampler": sampler.__name__},
+            "reinit": True,
+        }
+
+        wandbc = WeightsAndBiasesCallback(
+            metric_name="val_accuracy", wandb_kwargs=wandb_kwargs
+        )
+
+        study = optuna.create_study(direction="maximize", sampler=sampler())
+        study.optimize(objective, n_trials=n_trials, callbacks=[wandbc])
+
+        f = "best_{}".format
+        for param_name, param_value in study.best_trial.params.items():
+            wandb.run.summary[f(param_name)] = param_value
+
+        wandb.run.summary["best accuracy"] = study.best_trial.value
+
+        wandb.log(
+            {
+                "optuna_optimization_history": optuna.visualization.plot_optimization_history(
+                    study
+                ),
+                "optuna_param_importances": optuna.visualization.plot_param_importances(
+                    study
+                ),
             }
+        )
 
-            wandbc = WeightsAndBiasesCallback(metric_name="accuracy", wandb_kwargs=wandb_kwargs)
-
-            study = optuna.create_study(direction="maximize", sampler=sampler())
-            study.optimize(objective, n_trials=30, callbacks=[wandbc])
-
-            print("Number of finished trials: ", len(study.trials))
-
-            print("Best trial:")
-            trial = study.best_trial
-
-            print("  Value: ", trial.value)
-
-            print("  Params: ")
-            for key, value in trial.params.items():
-                print("    {}: {}".format(key, value))
-            wandb.run.summary["best accuracy"] = trial.value
-            wandb.finish()
+        wandb.finish()

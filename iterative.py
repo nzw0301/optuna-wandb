@@ -51,7 +51,9 @@ def define_model(trial):
 
 # Get the data loaders of FashionMNIST dataset.
 train_loader = torch.utils.data.DataLoader(
-    datasets.FashionMNIST(DIR, train=True, download=True, transform=transforms.ToTensor()),
+    datasets.FashionMNIST(
+        DIR, train=True, download=True, transform=transforms.ToTensor()
+    ),
     batch_size=BATCHSIZE,
     shuffle=True,
 )
@@ -81,7 +83,7 @@ def objective(trial):
         entity="nzw0301",  # NOTE: this entity depends on your wandb account.
         config=config,
         group=STUDY_NAME,
-        reinit=True
+        reinit=True,
     )
 
     # Training of the model.
@@ -135,7 +137,11 @@ def objective(trial):
 
 
 if __name__ == "__main__":
-    study = optuna.create_study(direction="maximize", study_name=STUDY_NAME, pruner=optuna.pruners.MedianPruner())
+    study = optuna.create_study(
+        direction="maximize",
+        study_name=STUDY_NAME,
+        pruner=optuna.pruners.MedianPruner(),
+    )
     study.optimize(objective, n_trials=100, timeout=600)
 
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
