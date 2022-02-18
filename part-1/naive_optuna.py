@@ -120,10 +120,9 @@ def objective(trial):
     return val_accuracy
 
 
-if __name__ == "__main__":
-    study = optuna.create_study(
-        direction="maximize",
-        study_name=STUDY_NAME,
-        pruner=optuna.pruners.MedianPruner(),
-    )
-    study.optimize(objective, n_trials=100, timeout=600)
+study = optuna.create_study(
+    direction="maximize",
+    study_name=STUDY_NAME,
+    pruner=optuna.pruners.MedianPruner(),
+)
+study.optimize(objective, n_trials=100, timeout=600)
