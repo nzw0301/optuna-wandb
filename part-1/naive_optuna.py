@@ -25,6 +25,57 @@ N_VALID_EXAMPLES = BATCHSIZE * 10
 STUDY_NAME = "pytorch-optimization"
 
 
+# Get the data loaders of FashionMNIST dataset.
+train_loader = torch.utils.data.DataLoader(
+    datasets.FashionMNIST(
+        DIR, train=True, download=True, transform=transforms.ToTensor()
+    ),
+    batch_size=BATCHSIZE,
+    shuffle=True,
+)
+valid_loader = torch.utils.data.DataLoader(
+    datasets.FashionMNIST(DIR, train=False, transform=transforms.ToTensor()),
+    batch_size=BATCHSIZE,
+    shuffle=True,
+)
+
+
+def train(optimizer, model, train_loader):
+    model.train()
+    for batch_idx, (data, target) in enumerate(train_loader):
+        # Limiting training data for faster epochs.
+        if batch_idx * BATCHSIZE >= N_TRAIN_EXAMPLES:
+            break
+
+        data, target = data.view(data.size(0), -1).to(DEVICE), target.to(DEVICE)
+
+        optimizer.zero_grad()
+        output = model(data)
+        loss = F.nll_loss(output, target)
+        loss.backward()
+        optimizer.step()
+
+
+def validate(model, valid_loader):
+    # Validation of the model.
+    model.eval()
+    correct = 0
+    with torch.no_grad():
+        for batch_idx, (data, target) in enumerate(valid_loader):
+            # Limiting validation data.
+            if batch_idx * BATCHSIZE >= N_VALID_EXAMPLES:
+                break
+            data, target = data.view(data.size(0), -1).to(DEVICE), target.to(DEVICE)
+            output = model(data)
+            # Get the index of the max log-probability.
+            pred = output.argmax(dim=1, keepdim=True)
+            correct += pred.eq(target.view_as(pred)).sum().item()
+
+    accuracy = correct / min(len(valid_loader.dataset), N_VALID_EXAMPLES)
+
+    return accuracy
+
+
 def define_model(trial):
     # We optimize the number of layers, hidden units and dropout ratio in each layer.
     n_layers = trial.suggest_int("n_layers", 1, 3)
@@ -45,21 +96,6 @@ def define_model(trial):
     return nn.Sequential(*layers)
 
 
-# Get the data loaders of FashionMNIST dataset.
-train_loader = torch.utils.data.DataLoader(
-    datasets.FashionMNIST(
-        DIR, train=True, download=True, transform=transforms.ToTensor()
-    ),
-    batch_size=BATCHSIZE,
-    shuffle=True,
-)
-valid_loader = torch.utils.data.DataLoader(
-    datasets.FashionMNIST(DIR, train=False, transform=transforms.ToTensor()),
-    batch_size=BATCHSIZE,
-    shuffle=True,
-)
-
-
 def objective(trial):
 
     # Generate the model.
@@ -72,42 +108,16 @@ def objective(trial):
 
     # Training of the model.
     for epoch in range(EPOCHS):
-        model.train()
-        for batch_idx, (data, target) in enumerate(train_loader):
-            # Limiting training data for faster epochs.
-            if batch_idx * BATCHSIZE >= N_TRAIN_EXAMPLES:
-                break
+        train(optimizer, model, train_loader)
+        val_accuracy = validate(model, valid_loader)
 
-            data, target = data.view(data.size(0), -1).to(DEVICE), target.to(DEVICE)
-
-            optimizer.zero_grad()
-            output = model(data)
-            loss = F.nll_loss(output, target)
-            loss.backward()
-            optimizer.step()
-
-        # Validation of the model.
-        model.eval()
-        correct = 0
-        with torch.no_grad():
-            for batch_idx, (data, target) in enumerate(valid_loader):
-                # Limiting validation data.
-                if batch_idx * BATCHSIZE >= N_VALID_EXAMPLES:
-                    break
-                data, target = data.view(data.size(0), -1).to(DEVICE), target.to(DEVICE)
-                output = model(data)
-                # Get the index of the max log-probability.
-                pred = output.argmax(dim=1, keepdim=True)
-                correct += pred.eq(target.view_as(pred)).sum().item()
-
-        accuracy = correct / min(len(valid_loader.dataset), N_VALID_EXAMPLES)
-        trial.report(accuracy, epoch)
+        trial.report(val_accuracy, epoch)
 
         # Handle pruning based on the intermediate value.
         if trial.should_prune():
             raise optuna.exceptions.TrialPruned()
 
-    return accuracy
+    return val_accuracy
 
 
 if __name__ == "__main__":
