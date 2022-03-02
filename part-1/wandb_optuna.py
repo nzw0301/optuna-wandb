@@ -5,7 +5,6 @@ The main code is based on https://github.com/optuna/optuna-examples/blob/63fe36d
 import wandb
 import os
 import optuna
-from optuna.trial import TrialState
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
