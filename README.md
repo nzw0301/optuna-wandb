@@ -1,7 +1,7 @@
 # Optuna meets Weights and Biases
 
-This repo provides the examples codes used in ...
-
+This repo provides the examples codes used in the medium post titled [Optuna meets Weights and Biases
+](https://medium.com/optuna/optuna-meets-weights-and-biases-58fc6bab893).
 ---
 
 ## Installation
